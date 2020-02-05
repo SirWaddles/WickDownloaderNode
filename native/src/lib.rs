@@ -1,8 +1,9 @@
 use neon::prelude::*;
+use neon::context::Context;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::runtime;
-use wickdl::{ServiceState, EncryptedPak};
+use wickdl::{ServiceState, EncryptedPak, PakService};
 
 pub struct RuntimeContainerInner {
     runtime: runtime::Runtime,
@@ -18,6 +19,10 @@ pub struct RuntimeContainer {
 
 pub struct EncryptedPakContainer {
     pak: Option<EncryptedPak>,
+}
+
+pub struct PakContainer {
+    pak: Option<PakService>,
 }
 
 declare_types! {
@@ -104,24 +109,67 @@ declare_types! {
                 let data = this.borrow(&guard);
                 (data.cb.clone(), Arc::clone(&data.inner))
             };
-            
+
             let service = Arc::clone(state.service.lock().unwrap().as_ref().unwrap());
             let counter = state.next_counter.fetch_add(1, Ordering::AcqRel) as f64;
 
             state.runtime.spawn(async move {
                 match service.get_pak(pak_name).await {
                     Ok(pak) => {
-                        cb.schedule(move |cx| -> Vec<Handle<JsValue>> {
-                            let mut pak_container = JsEncryptedPak::new::<_, JsEncryptedPak, _>(&mut cx, vec![]).unwrap();
-                            let guard = cx.lock();
+                        cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
+                            let mut pak_container = JsEncryptedPak::new::<_, JsEncryptedPak, _>(tcx, vec![]).unwrap();
+                            let guard = tcx.lock();
                             pak_container.borrow_mut(&guard).pak = Some(pak);
-                            vec![cx.number(counter).upcast(), cx.number(0.0).upcast(), pak_container.upcast()]
+                            vec![tcx.number(counter).upcast(), tcx.number(0.0).upcast(), pak_container.upcast()]
                         });
                     },
                     Err(_) => {
-                        cb.schedule(move |cx| -> Vec<Handle<JsValue>> {
-                            vec![cx.number(counter).upcast(), cx.number(1.0).upcast()]
+                        cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
+                            vec![tcx.number(counter).upcast(), tcx.number(1.0).upcast()]
                         });
+                    },
+                }
+            });
+
+            Ok(cx.number(counter).upcast())
+        }
+
+        method decrypt_pak(mut cx) {
+            let this = cx.this();
+            let mut pak = cx.argument::<JsEncryptedPak>(0)?;
+            let key = cx.argument::<JsString>(1)?.value();
+            let (cb, state) = {
+                let guard = cx.lock();
+                let data = this.borrow(&guard);
+                (data.cb.clone(), Arc::clone(&data.inner))
+            };
+            let encpakop = {
+                let guard = cx.lock();
+                let mut data = pak.borrow_mut(&guard);
+                data.pak.take()
+            };
+            let encpak = match encpakop {
+                Some(inner) => inner,
+                None => return cx.throw_error("Pak already consumed"),
+            };
+
+            let service = Arc::clone(state.service.lock().unwrap().as_ref().unwrap());
+            let counter = state.next_counter.fetch_add(1, Ordering::AcqRel) as f64;
+
+            state.runtime.spawn(async move {
+                match service.decrypt_pak(encpak, key).await {
+                    Ok(pak) => {
+                        cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
+                            let mut pak_container = JsPakContainer::new::<_, JsPakContainer, _>(tcx, vec![]).unwrap();
+                            let guard = tcx.lock();
+                            pak_container.borrow_mut(&guard).pak = Some(pak);
+                            vec![tcx.number(counter).upcast(), tcx.number(0.0).upcast(), pak_container.upcast()]
+                        })
+                    },
+                    Err(_) => {
+                        cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
+                            vec![tcx.number(counter).upcast(), tcx.number(1.0).upcast()]
+                        })
                     },
                 }
             });
@@ -135,6 +183,36 @@ declare_types! {
             Ok(EncryptedPakContainer {
                 pak: None,
             })
+        }
+    }
+
+    pub class JsPakContainer for PakContainer {
+        init(_) {
+            Ok(PakContainer {
+                pak: None,
+            })
+        }
+
+        method get_pak_mount(mut cx) {
+            let this = cx.this();
+            let contents = {
+                let guard = cx.lock();
+                let data = this.borrow(&guard);
+                match data.pak {
+                    Some(inner) => Some(inner.get_mount_point().to_owned()),
+                    None => None,
+                }
+            };
+            let mount = match contents {
+                Some(inner) => inner,
+                None => return cx.throw_error("No pak inside container"),
+            };
+
+            Ok(JsString::new(&mut cx, mount).upcast())
+        }
+
+        method get_file_names(mut cx) {
+
         }
     }
 }
