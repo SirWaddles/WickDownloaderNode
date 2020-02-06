@@ -17,4 +17,4 @@ neon-build = { git = "https://github.com/neon-bindings/neon" }
 [dependencies]
 neon = { git = "https://github.com/neon-bindings/neon", features = ["event-handler-api"] }
 tokio = { version = "0.2", features = ["full"] }
-wickdl = { path = "E:\\GitHub\\WickDownloader" }
+wickdl = { path = "D:\\GitHub\\WickDownloader" }
