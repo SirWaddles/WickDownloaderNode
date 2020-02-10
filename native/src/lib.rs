@@ -33,8 +33,8 @@ pub struct RuntimeContainerInner {
 }
 
 pub struct RuntimeContainer {
-    inner: Arc<RuntimeContainerInner>,
-    cb: EventHandler,
+    inner: Option<Arc<RuntimeContainerInner>>,
+    cb: Option<EventHandler>,
 }
 
 pub struct EncryptedPakContainer {
@@ -60,12 +60,12 @@ declare_types! {
             let cb = EventHandler::new(&cx, this, js_cb);
 
             Ok(RuntimeContainer {
-                inner: Arc::new(RuntimeContainerInner {
+                inner: Some(Arc::new(RuntimeContainerInner {
                     runtime: rt,
                     service: Mutex::new(None),
                     next_counter: AtomicU32::new(1),
-                }),
-                cb,
+                })),
+                cb: Some(cb),
             })
         }
 
@@ -74,7 +74,7 @@ declare_types! {
             let (cb, state) = {
                 let guard = cx.lock();
                 let data = this.borrow(&guard);
-                (data.cb.clone(), Arc::clone(&data.inner))
+                (data.cb.as_ref().unwrap().clone(), Arc::clone(&data.inner.as_ref().unwrap()))
             };
             let counter = state.next_counter.fetch_add(1, Ordering::AcqRel) as f64;
 
@@ -106,7 +106,7 @@ declare_types! {
             let state = {
                 let guard = cx.lock();
                 let data = this.borrow(&guard);
-                Arc::clone(&data.inner)
+                Arc::clone(&data.inner.as_ref().unwrap())
             };
 
             let service = Arc::clone(state.service.lock().unwrap().as_ref().unwrap());
@@ -127,7 +127,7 @@ declare_types! {
             let (cb, state) = {
                 let guard = cx.lock();
                 let data = this.borrow(&guard);
-                (data.cb.clone(), Arc::clone(&data.inner))
+                (data.cb.as_ref().unwrap().clone(), Arc::clone(&data.inner.as_ref().unwrap()))
             };
 
             let service = Arc::clone(state.service.lock().unwrap().as_ref().unwrap());
@@ -161,7 +161,7 @@ declare_types! {
             let (cb, state) = {
                 let guard = cx.lock();
                 let data = this.borrow(&guard);
-                (data.cb.clone(), Arc::clone(&data.inner))
+                (data.cb.as_ref().unwrap().clone(), Arc::clone(&data.inner.as_ref().unwrap()))
             };
             let encpakop = {
                 let guard = cx.lock();
@@ -204,7 +204,7 @@ declare_types! {
             let (cb, state) = {
                 let guard = cx.lock();
                 let data = this.borrow(&guard);
-                (data.cb.clone(), Arc::clone(&data.inner))
+                (data.cb.as_ref().unwrap().clone(), Arc::clone(&data.inner.as_ref().unwrap()))
             };
             let pak = {
                 let guard = cx.lock();
@@ -244,6 +244,17 @@ declare_types! {
             });
 
             Ok(cx.number(counter).upcast())
+        }
+
+        method shutdown(mut cx) {
+            let mut this = cx.this();
+            {
+                let guard = cx.lock();
+                let mut data = this.borrow_mut(&guard);
+                data.inner = None;
+                data.cb = None;
+            }
+            Ok(cx.undefined().upcast())
         }
     }
 
