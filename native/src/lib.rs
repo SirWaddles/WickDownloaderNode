@@ -76,7 +76,7 @@ declare_types! {
                 let data = this.borrow(&guard);
                 (data.cb.as_ref().unwrap().clone(), Arc::clone(&data.inner.as_ref().unwrap()))
             };
-            let counter = state.next_counter.fetch_add(1, Ordering::AcqRel) as f64;
+            let counter = state.next_counter.fetch_add(1, Ordering::SeqCst) as f64;
 
             // Still don't know how to do this properly
             let state2 = Arc::clone(&state);
@@ -121,6 +121,37 @@ declare_types! {
             Ok(js_array.upcast())
         }
 
+        method download_pak(mut cx) {
+            let this = cx.this();
+            let pak_name = cx.argument::<JsString>(0)?.value();
+            let target_file = cx.argument::<JsString>(1)?.value();
+            let (cb, state) = {
+                let guard = cx.lock();
+                let data = this.borrow(&guard);
+                (data.cb.as_ref().unwrap().clone(), Arc::clone(&data.inner.as_ref().unwrap()))
+            };
+
+            let service = Arc::clone(state.service.lock().unwrap().as_ref().unwrap());
+            let counter = state.next_counter.fetch_add(1, Ordering::SeqCst) as f64;
+
+            state.runtime.spawn(async move {
+                match service.download_pak(pak_name, target_file).await {
+                    Ok(_) => {
+                        cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
+                            vec![tcx.number(counter).upcast(), tcx.number(0.0).upcast()]
+                        });
+                    },
+                    Err(_) => {
+                        cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
+                            vec![tcx.number(counter).upcast(), tcx.number(1.0).upcast()]
+                        });
+                    },
+                }
+            });
+
+            Ok(cx.number(counter).upcast())
+        }
+
         method get_pak(mut cx) {
             let this = cx.this();
             let pak_name = cx.argument::<JsString>(0)?.value();
@@ -131,7 +162,7 @@ declare_types! {
             };
 
             let service = Arc::clone(state.service.lock().unwrap().as_ref().unwrap());
-            let counter = state.next_counter.fetch_add(1, Ordering::AcqRel) as f64;
+            let counter = state.next_counter.fetch_add(1, Ordering::SeqCst) as f64;
 
             state.runtime.spawn(async move {
                 match service.get_pak(pak_name).await {
@@ -174,7 +205,7 @@ declare_types! {
             };
 
             let service = Arc::clone(state.service.lock().unwrap().as_ref().unwrap());
-            let counter = state.next_counter.fetch_add(1, Ordering::AcqRel) as f64;
+            let counter = state.next_counter.fetch_add(1, Ordering::SeqCst) as f64;
 
             state.runtime.spawn(async move {
                 match service.decrypt_pak(encpak, key).await {
@@ -218,7 +249,7 @@ declare_types! {
                 Some(inner) => inner,
                 None => return cx.throw_error("No pak inside container"),
             };
-            let counter = state.next_counter.fetch_add(1, Ordering::AcqRel) as f64;
+            let counter = state.next_counter.fetch_add(1, Ordering::SeqCst) as f64;
 
             state.runtime.spawn(async move {
                 match pak.get_data(&file).await {
