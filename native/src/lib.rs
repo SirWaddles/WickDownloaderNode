@@ -48,12 +48,21 @@ pub struct PakContainer {
 declare_types! {
     pub class JsRuntimeContainer for RuntimeContainer {
         init(mut cx) {
-            let rt = runtime::Builder::new()
-                .enable_all()
-                .threaded_scheduler()
-                .core_threads(4)
-                .build()
-                .unwrap();
+            let core_count = num_cpus::get();
+            let mut builder = runtime::Builder::new();
+            builder.enable_all();
+            match core_count {
+                0 | 1 => {
+                    builder.basic_scheduler();
+                },
+                2..=16 => {
+                    builder.threaded_scheduler().core_threads(core_count);
+                },
+                _ => {
+                    builder.threaded_scheduler().core_threads(8);
+                },
+            };
+            let rt = builder.build().unwrap();
 
             let js_cb = cx.argument::<JsFunction>(0)?;
             let this = cx.this();

@@ -1,18 +1,36 @@
 {
-  "name": "wick-downloader",
-  "version": "0.1.0",
-  "description": "An asynchronous partial EGS downloader",
-  "main": "lib/index.js",
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/SirWaddles/WickDownloaderNode.git"
-  },
-  "author": "Waddlesworth <github@genj.io>",
-  "license": "MIT",
-  "dependencies": {
-    "neon-cli": "^0.3.3"
-  },
-  "scripts": {
-    "install": "neon build"
-  }
+    "name": "wick-downloader",
+    "version": "0.1.0",
+    "description": "An asynchronous partial EGS downloader",
+    "main": "lib/index.js",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/SirWaddles/WickDownloaderNode.git"
+    },
+    "author": "Waddlesworth <github@genj.io>",
+    "license": "MIT",
+    "dependencies": {
+        "node-pre-gyp": "^0.14.0"
+    },
+    "scripts": {
+        "compile": "neon build --release",
+        "install": "node-pre-gyp install",
+        "package": "node-pre-gyp package",
+        "gpublish": "node-pre-gyp-github publish"
+    },
+    "files": [
+        "lib/"
+    ],
+    "binary": {
+        "module_name": "index",
+        "host": "https://github.com/SirWaddles/WickDownloaderNode/releases/download/",
+        "remote_path": "v{version}",
+        "package_name": "{node_abi}-{platform}-{arch}.tar.gz",
+        "module_path": "./dist",
+        "pkg_path": "."
+    },
+    "devDependencies": {
+        "neon-cli": "^0.3.3",
+        "node-pre-gyp-github": "^1.4.3"
+    }
 }
