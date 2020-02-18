@@ -80,23 +80,47 @@ declare_types! {
             let state2 = Arc::clone(&state);
 
             state.runtime.spawn(async move {
-                let args: Vec<f64> = match ServiceState::new().await {
+                match ServiceState::new().await {
                     Ok(service) => {
                         let mut lock = state2.service.lock().unwrap();
                         *lock = Some(Arc::new(service));
-                        vec![counter, 0.0]
+                        cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
+                            vec![tcx.number(counter).upcast(), tcx.number(0.0).upcast()]
+                        });
                     },
-                    Err(_) => {
-                        vec![counter, 1.0]
+                    Err(err) => {
+                        cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
+                            let err = JsString::new(tcx, format!("Error: {}", err)).upcast();
+                            vec![tcx.number(counter).upcast(), tcx.number(1.0).upcast(), err]
+                        });
                     },
-                };
-                cb.schedule(move |cx| {
-                    let res: Vec<Handle<JsValue>> = args.iter().map(|&v| cx.number(v).upcast()).collect();
-                    res
-                });
+                }
             });
 
             Ok(cx.number(counter).upcast())
+        }
+
+        method start_with_manifest(mut cx) {
+            let this = cx.this();
+            let state = {
+                let guard = cx.lock();
+                let data = this.borrow(&guard);
+                Arc::clone(&data.inner.as_ref().unwrap())
+            };
+
+            let app_manifest = cx.argument::<JsString>(0)?.value();
+            let chunk_manifest = cx.argument::<JsString>(1)?.value();
+            let service = match ServiceState::from_manifests(&app_manifest, &chunk_manifest) {
+                Ok(d) => d,
+                Err(_) => return cx.throw_error("Cannot parse manifests"),
+            };
+
+            {
+                let mut lock = state.service.lock().unwrap();
+                *lock = Some(Arc::new(service));
+            }
+
+            Ok(cx.undefined().upcast())
         }
 
         method get_paks(mut cx) {
@@ -139,9 +163,10 @@ declare_types! {
                             vec![tcx.number(counter).upcast(), tcx.number(0.0).upcast()]
                         });
                     },
-                    Err(_) => {
+                    Err(err) => {
                         cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
-                            vec![tcx.number(counter).upcast(), tcx.number(1.0).upcast()]
+                            let err = JsString::new(tcx, format!("Error: {}", err)).upcast();
+                            vec![tcx.number(counter).upcast(), tcx.number(1.0).upcast(), err]
                         });
                     },
                 }
@@ -172,9 +197,10 @@ declare_types! {
                             vec![tcx.number(counter).upcast(), tcx.number(0.0).upcast(), pak_container.upcast()]
                         });
                     },
-                    Err(_) => {
+                    Err(err) => {
                         cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
-                            vec![tcx.number(counter).upcast(), tcx.number(1.0).upcast()]
+                            let err = JsString::new(tcx, format!("Error: {}", err)).upcast();
+                            vec![tcx.number(counter).upcast(), tcx.number(1.0).upcast(), err]
                         });
                     },
                 }
@@ -215,9 +241,10 @@ declare_types! {
                             vec![tcx.number(counter).upcast(), tcx.number(0.0).upcast(), pak_container.upcast()]
                         })
                     },
-                    Err(_) => {
+                    Err(err) => {
                         cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
-                            vec![tcx.number(counter).upcast(), tcx.number(1.0).upcast()]
+                            let err = JsString::new(tcx, format!("Error: {}", err)).upcast();
+                            vec![tcx.number(counter).upcast(), tcx.number(1.0).upcast(), err]
                         })
                     },
                 }
@@ -264,9 +291,10 @@ declare_types! {
                             vec![tcx.number(counter).upcast(), tcx.number(0.0).upcast(), buffer.upcast()]
                         });
                     },
-                    Err(_) => {
+                    Err(err) => {
                         cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
-                            vec![tcx.number(counter).upcast(), tcx.number(1.0).upcast()]
+                            let err = JsString::new(tcx, format!("Error: {}", err)).upcast();
+                            vec![tcx.number(counter).upcast(), tcx.number(1.0).upcast(), err]
                         });
                     },
                 }
