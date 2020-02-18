@@ -11,7 +11,7 @@ environment:
         - docker_image: genjio/neon:13linux
 
 build_script:
-    - npm install
+    - npm install neon-cli node-pre-gyp node-pre-gyp-github
     - node ./prepare.js build
 
 on_success:
