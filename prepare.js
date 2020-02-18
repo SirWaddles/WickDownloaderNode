@@ -28,18 +28,29 @@ function PackageProgram() {
 }
 
 function PublishProgram() {
-    process.env['NODE_PRE_GYP_GITHUB_TOKEN'] = fs.readFileSync("./deploy_token.txt");
+    if (!process.env['NODE_PRE_GYP_GITHUB_TOKEN']) {
+        process.env['NODE_PRE_GYP_GITHUB_TOKEN'] = fs.readFileSync("./deploy_token.txt");
+    }
     const publisher = new nodepregit();
     publisher.publish();
 }
 
-async function RunPublish() {
+async function BuildProgram() {
     deleteFolderRecursive('./dist');
     fs.mkdirSync('./dist');
     await neon_build.default(process.cwd());
     fs.copyFileSync('./native/index.node', './dist/index.node');
+}
+
+async function RunPublish() {
     await PackageProgram();
     PublishProgram();
 }
 
-RunPublish();
+if (process.argv[2] == "build") {
+    BuildProgram();
+}
+
+if (process.argv[2] == "publish") {
+    RunPublish();
+}
