@@ -1460,7 +1460,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "wick-downloader"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "neon 0.3.3 (git+https://github.com/neon-bindings/neon)",
  "neon-build 0.3.3 (git+https://github.com/neon-bindings/neon)",
