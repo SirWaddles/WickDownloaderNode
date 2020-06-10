@@ -1,6 +1,6 @@
 [package]
 name = "wick-downloader"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["Waddlesworth <github@genj.io>"]
 license = "MIT"
 build = "build.rs"
