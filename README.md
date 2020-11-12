@@ -2,6 +2,8 @@
 
 An asynchronous partial EGS downloader. This can be used to download individual asset files without downloading the entire archive.
 
+Note: This build **requires** that `oo2core_8_win64.dll` on Windows or `oo2core_8_win64.so` on Linux exists in the working directory.
+
 # API
 
 ## WickDownloader
