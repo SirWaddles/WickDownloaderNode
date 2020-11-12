@@ -1,29 +1,8 @@
 use neon::prelude::*;
-use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::runtime;
-use wickdl::{ServiceState, EncryptedPak, PakService};
-
-// https://stackoverflow.com/a/27650405/3479580
-struct HexSlice<'a>(&'a [u8]);
-
-impl<'a> HexSlice<'a> {
-    fn new<T>(data: &'a T) -> HexSlice<'a> 
-        where T: ?Sized + AsRef<[u8]> + 'a
-    {
-        HexSlice(data.as_ref())
-    }
-}
-
-impl<'a> fmt::Display for HexSlice<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for byte in self.0 {
-            write!(f, "{:02X}", byte)?;
-        }
-        Ok(())
-    }
-}
+use wickdl::{ServiceState, UtocService};
 
 pub struct RuntimeContainerInner {
     runtime: runtime::Runtime,
@@ -37,12 +16,8 @@ pub struct RuntimeContainer {
     cb: Option<EventHandler>,
 }
 
-pub struct EncryptedPakContainer {
-    pak: Option<EncryptedPak>,
-}
-
-pub struct PakContainer {
-    pak: Option<Arc<PakService>>,
+pub struct UtocServiceContainer {
+    service: Option<Arc<UtocService>>,
 }
 
 declare_types! {
@@ -143,7 +118,7 @@ declare_types! {
             Ok(js_array.upcast())
         }
 
-        method download_pak(mut cx) {
+        method download_file(mut cx) {
             let this = cx.this();
             let pak_name = cx.argument::<JsString>(0)?.value();
             let target_file = cx.argument::<JsString>(1)?.value();
@@ -157,7 +132,7 @@ declare_types! {
             let counter = state.next_counter.fetch_add(1, Ordering::SeqCst) as f64;
 
             state.runtime.spawn(async move {
-                match service.download_pak(pak_name, target_file).await {
+                match service.download_file(pak_name, target_file).await {
                     Ok(_) => {
                         cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
                             vec![tcx.number(counter).upcast(), tcx.number(0.0).upcast()]
@@ -175,7 +150,7 @@ declare_types! {
             Ok(cx.number(counter).upcast())
         }
 
-        method get_pak(mut cx) {
+        method get_utoc(mut cx) {
             let this = cx.this();
             let pak_name = cx.argument::<JsString>(0)?.value();
             let (cb, state) = {
@@ -188,12 +163,12 @@ declare_types! {
             let counter = state.next_counter.fetch_add(1, Ordering::SeqCst) as f64;
 
             state.runtime.spawn(async move {
-                match service.get_pak(pak_name).await {
+                match service.get_utoc(&pak_name).await {
                     Ok(pak) => {
                         cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
-                            let mut pak_container = JsEncryptedPak::new::<_, JsEncryptedPak, _>(tcx, vec![]).unwrap();
+                            let mut pak_container = JsUtocService::new::<_, JsUtocService, _>(tcx, vec![]).unwrap();
                             let guard = tcx.lock();
-                            pak_container.borrow_mut(&guard).pak = Some(pak);
+                            pak_container.borrow_mut(&guard).service = Some(Arc::new(pak));
                             vec![tcx.number(counter).upcast(), tcx.number(0.0).upcast(), pak_container.upcast()]
                         });
                     },
@@ -202,50 +177,6 @@ declare_types! {
                             let err = JsString::new(tcx, format!("Error: {}", err)).upcast();
                             vec![tcx.number(counter).upcast(), tcx.number(1.0).upcast(), err]
                         });
-                    },
-                }
-            });
-
-            Ok(cx.number(counter).upcast())
-        }
-
-        method decrypt_pak(mut cx) {
-            let this = cx.this();
-            let mut pak = cx.argument::<JsEncryptedPak>(0)?;
-            let key = cx.argument::<JsString>(1)?.value();
-            let (cb, state) = {
-                let guard = cx.lock();
-                let data = this.borrow(&guard);
-                (data.cb.as_ref().unwrap().clone(), Arc::clone(&data.inner.as_ref().unwrap()))
-            };
-            let encpakop = {
-                let guard = cx.lock();
-                let mut data = pak.borrow_mut(&guard);
-                data.pak.take()
-            };
-            let encpak = match encpakop {
-                Some(inner) => inner,
-                None => return cx.throw_error("Pak already consumed"),
-            };
-
-            let service = Arc::clone(state.service.lock().unwrap().as_ref().unwrap());
-            let counter = state.next_counter.fetch_add(1, Ordering::SeqCst) as f64;
-
-            state.runtime.spawn(async move {
-                match service.decrypt_pak(encpak, key).await {
-                    Ok(pak) => {
-                        cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
-                            let mut pak_container = JsPakContainer::new::<_, JsPakContainer, _>(tcx, vec![]).unwrap();
-                            let guard = tcx.lock();
-                            pak_container.borrow_mut(&guard).pak = Some(Arc::new(pak));
-                            vec![tcx.number(counter).upcast(), tcx.number(0.0).upcast(), pak_container.upcast()]
-                        })
-                    },
-                    Err(err) => {
-                        cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
-                            let err = JsString::new(tcx, format!("Error: {}", err)).upcast();
-                            vec![tcx.number(counter).upcast(), tcx.number(1.0).upcast(), err]
-                        })
                     },
                 }
             });
@@ -255,7 +186,7 @@ declare_types! {
 
         method get_file_data(mut cx) {
             let this = cx.this();
-            let pak = cx.argument::<JsPakContainer>(0)?;
+            let pak = cx.argument::<JsUtocService>(0)?;
             let file = cx.argument::<JsString>(1)?.value();
             let (cb, state) = {
                 let guard = cx.lock();
@@ -265,7 +196,7 @@ declare_types! {
             let pak = {
                 let guard = cx.lock();
                 let data = pak.borrow(&guard);
-                match &data.pak {
+                match &data.service {
                     Some(inner) => Some(Arc::clone(&inner)),
                     None => None,
                 }
@@ -277,7 +208,7 @@ declare_types! {
             let counter = state.next_counter.fetch_add(1, Ordering::SeqCst) as f64;
 
             state.runtime.spawn(async move {
-                match pak.get_data(&file).await {
+                match pak.get_file(&file).await {
                     Ok(data) => {
                         cb.schedule(move |tcx| -> Vec<Handle<JsValue>> {
                             let buffer = {
@@ -315,27 +246,19 @@ declare_types! {
         }
     }
 
-    pub class JsEncryptedPak for EncryptedPakContainer {
+    pub class JsUtocService for UtocServiceContainer {
         init(_) {
-            Ok(EncryptedPakContainer {
-                pak: None,
-            })
-        }
-    }
-
-    pub class JsPakContainer for PakContainer {
-        init(_) {
-            Ok(PakContainer {
-                pak: None,
+            Ok(UtocServiceContainer {
+                service: None,
             })
         }
 
-        method get_pak_mount(mut cx) {
+        method get_mount_point(mut cx) {
             let this = cx.this();
             let contents = {
                 let guard = cx.lock();
                 let data = this.borrow(&guard);
-                match &data.pak {
+                match &data.service {
                     Some(inner) => Some(inner.get_mount_point().to_owned()),
                     None => None,
                 }
@@ -353,8 +276,8 @@ declare_types! {
             let contents = {
                 let guard = cx.lock();
                 let data = this.borrow(&guard);
-                match &data.pak {
-                    Some(inner) => Some(inner.get_files()),
+                match &data.service {
+                    Some(inner) => Some(inner.get_file_list().clone()),
                     None => None,
                 }
             };
@@ -368,29 +291,6 @@ declare_types! {
                 ret_arr.set(&mut cx, i as u32, entry).unwrap();
             }
             Ok(ret_arr.upcast())
-        }
-
-        method get_file_hash(mut cx) {
-            let this = cx.this();
-            let filepath = cx.argument::<JsString>(0)?.value();
-
-            let contents = {
-                let guard = cx.lock();
-                let data = this.borrow(&guard);
-                match &data.pak {
-                    Some(inner) => Some(inner.get_hash(&filepath)),
-                    None => None,
-                }
-            };
-            let hash = match contents {
-                Some(inner) => match inner {
-                    Ok(hash) => format!("{}", HexSlice::new(&hash)),
-                    Err(_) => return cx.throw_error("File does not exist"),
-                },
-                None => return cx.throw_error("No pak inside container"),
-            };
-
-            Ok(JsString::new(&mut cx, hash).upcast())
         }
     }
 }
