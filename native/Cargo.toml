@@ -1,6 +1,6 @@
 [package]
 name = "wick-downloader"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Waddlesworth <github@genj.io>"]
 license = "MIT"
 build = "build.rs"
@@ -12,9 +12,9 @@ name = "wick_downloader"
 crate-type = ["cdylib"]
 
 [build-dependencies]
-neon-build = { git = "https://github.com/neon-bindings/neon" }
+neon-build = { git = "https://github.com/neon-bindings/neon", branch="main" }
 
 [dependencies]
-neon = { git = "https://github.com/neon-bindings/neon", features = ["event-handler-api"] }
+neon = { git = "https://github.com/neon-bindings/neon", features = ["event-handler-api"], branch="main" }
 tokio = { version = "0.2", features = ["full"] }
 wickdl = { git = "https://github.com/SirWaddles/WickDownloader" }
