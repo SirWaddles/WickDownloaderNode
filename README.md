@@ -33,7 +33,9 @@ Used to initialize an individual utoc service. The `filename` argument must be a
 
 ```javascript
 const pakNames = wickdl.getPakNames();
-const utocService = await wickdl.getPak(pakNames[0]);
+
+// NOTE: The first item may not be the *.utoc file, a *.ucas won't be accepted
+const utocService = await wickdl.getUtoc(pakNames[0]);
 ```
 
 ### getFileData(pak: UtocServiceContainer, filename: string): Promise\<Buffer\>
