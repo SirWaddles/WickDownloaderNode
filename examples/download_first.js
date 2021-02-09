@@ -3,7 +3,7 @@ const { WickDownloader } = require('wick-downloader');
 
 async function DownloadAssetFile() {
     // Construct the downloader. This starts the internal runtime.
-    let downloader = new WickDownloader();
+    const downloader = new WickDownloader();
     try {
         // Grab the initial manifests.
         await downloader.startService();
@@ -11,21 +11,23 @@ async function DownloadAssetFile() {
         // Get a list of pak files available to the downloader.
         const pakNames = downloader.getPakNames();
 
-        // Fetch the first pak index from the servers
-        console.log("Downloading " + pakNames[0]);
-        const encryptedPak = await downloader.getPak(pakNames[0]);
-
-        // Decrypt the index
-        const pakService = await downloader.decryptPak(encryptedPak, "AES Key");
+        // Fetch the fourth pak index from the servers (FortniteGame/Content/Paks/pakchunk0-WindowsClient.utoc)
+        console.log("Downloading " + pakNames[3]);
+        const utocService = await downloader.getUtoc(pakNames[3]);
 
         // Get a list of files from the pak.
-        const pakFiles = pakService.get_file_names();
-        // and download the first one.
-        console.log("Downloading " + pakFiles[0]);
-        const fileData = await downloader.getFileData(pakService, pakFiles[0]);
+        const pakfiles = utocService.get_file_names();
 
-        const fileName = pakFiles[0].split("/").pop();
-        fs.writeFileSync("./" + filename, fileData);
+        //Get the first
+        const file = pakfiles[0];
+
+        // and download it.
+        console.log("Downloading " + file);
+        const fileData = await downloader.getFileData(utocService, file)
+        const fileName = file.split("/").pop();
+        
+        fs.writeFileSync("./" + fileName, fileData);
+
     } catch (e) {
         console.error(e);
     } finally {
