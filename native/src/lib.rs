@@ -23,9 +23,8 @@ pub struct UtocServiceContainer {
 declare_types! {
     pub class JsRuntimeContainer for RuntimeContainer {
         init(mut cx) {
-            let rt = runtime::Builder::new()
+            let rt = runtime::Builder::new_multi_thread()
                 .enable_all()
-                .threaded_scheduler()
                 .build().unwrap();
 
             let js_cb = cx.argument::<JsFunction>(0)?;
