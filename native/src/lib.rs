@@ -74,7 +74,7 @@ declare_types! {
             Ok(cx.number(counter).upcast())
         }
 
-        method start_with_manifest(mut cx) {
+        /*method start_with_manifest(mut cx) {
             let this = cx.this();
             let state = {
                 let guard = cx.lock();
@@ -95,7 +95,7 @@ declare_types! {
             }
 
             Ok(cx.undefined().upcast())
-        }
+        }*/
 
         method get_paks(mut cx) {
             let this = cx.this();

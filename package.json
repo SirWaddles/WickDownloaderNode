@@ -1,6 +1,6 @@
 {
     "name": "wick-downloader",
-    "version": "0.3.3",
+    "version": "0.3.4",
     "description": "An asynchronous partial EGS downloader",
     "main": "lib/index.js",
     "repository": {
