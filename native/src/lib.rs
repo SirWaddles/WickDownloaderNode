@@ -20,6 +20,16 @@ pub struct UtocServiceContainer {
     service: Option<Arc<UtocService>>,
 }
 
+fn get_buffer_contents(cx: &mut MethodContext<JsRuntimeContainer>, buffer: Handle<JsBuffer>) -> Vec<u8> {
+    let guard = cx.lock();
+    let contents = buffer.borrow(&guard);
+    let slice = contents.as_slice();
+    let mut buffer_data = vec![0u8; slice.len()];
+    buffer_data.as_mut_slice().copy_from_slice(slice);
+
+    buffer_data
+}
+
 declare_types! {
     pub class JsRuntimeContainer for RuntimeContainer {
         init(mut cx) {
@@ -74,7 +84,7 @@ declare_types! {
             Ok(cx.number(counter).upcast())
         }
 
-        /*method start_with_manifest(mut cx) {
+        method start_with_manifest(mut cx) {
             let this = cx.this();
             let state = {
                 let guard = cx.lock();
@@ -83,7 +93,10 @@ declare_types! {
             };
 
             let app_manifest = cx.argument::<JsString>(0)?.value();
-            let chunk_manifest = cx.argument::<JsString>(1)?.value();
+
+            let chunk_manifest_js = cx.argument::<JsBuffer>(1)?;
+            let chunk_manifest = get_buffer_contents(&mut cx, chunk_manifest_js);
+
             let service = match ServiceState::from_manifests(&app_manifest, &chunk_manifest) {
                 Ok(d) => d,
                 Err(_) => return cx.throw_error("Cannot parse manifests"),
@@ -95,7 +108,7 @@ declare_types! {
             }
 
             Ok(cx.undefined().upcast())
-        }*/
+        }
 
         method get_paks(mut cx) {
             let this = cx.this();
